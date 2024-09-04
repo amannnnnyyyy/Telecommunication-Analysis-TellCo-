@@ -1,0 +1,43 @@
+name: TellCo worth buying or selling
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install jupyter
+
+    - name: Debug:List all files in repo
+      run: |
+        ls -R
+
+    - name: Debug:List installed Python packages
+      run: pip list
+
+    - name: Run Streamlit app
+      run: |
+        nohup streamlit run src/dashboard.py --server.headless true &
+        sleep 10 
+        pkill -f 'streamlit run'
+      env:
+        STREAMLIT_SERVER_HEADLESS: 'true'
