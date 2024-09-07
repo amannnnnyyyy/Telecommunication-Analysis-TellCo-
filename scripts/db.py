@@ -2,17 +2,24 @@ import psycopg2
 from psycopg2 import sql
 import pandas as pd
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+database_Obj = os.environ.get('DB_Object')
+
 
 # os.getenv
 
 def returnFromDb():
-    dbName = 'telecom'
+    # dbName = 'telecom'
     # Database connection parameters
     conn = psycopg2.connect(
-        host="localhost",
-        database=dbName,
-        user="postgres",
-        password="admin"
+        host= os.environ.get("DB_OBJECT_HOST"),
+        database= os.environ.get("DB_OBJECT_DATABASE"),
+        user= os.environ.get("DB_OBJECT_USER"),
+        password= os.environ.get("DB_OBJECT_PASSWORD")
+
     )
 
     # Open a cursor to perform database operations
