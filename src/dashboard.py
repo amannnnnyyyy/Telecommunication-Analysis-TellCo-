@@ -10,14 +10,15 @@ current_directory = os.path.dirname(os.path.abspath(__file__))
 scripts_directory = os.path.join(current_directory, '..', 'scripts')
 sys.path.append(scripts_directory)
 from db import returnFromDb
+from IPython.display import display
 # Load data
-agg_data = returnFromDb()
+data = returnFromDb()
 
 primary_options = {
-    'Task 1: User Overview Analysis': ['Option 1.1', 'Option 1.2', 'Option 1.3'],
-    'Task 2: User Engagement Analysis': ['Option 2.1', 'Option 2.2', 'Option 2.3'],
-    'Task 3: Experience Analytics': ['Option 2.1', 'Option 2.2', 'Option 2.3'],
-    'Task 4: Satisfaction Analysis': ['Option 3.1', 'Option 3.2', 'Option 3.3']
+    'Task 1: User Overview Analysis': ['Sub Tasks', "User's behaviour", 'EDA'],
+    'Task 2: User Engagement Analysis': ['Engagement metrics per user', 'Engagement per App', 'Kmeans'],
+    'Task 3: Experience Analytics': ['top, bottom, and most frequent', 'Thoughput and TCP', 'Kmeans clustering'],
+    'Task 4: Satisfaction Analysis': ['Engagement score', 'Regression model', 'Model tracking']
 }
 
 # Sidebar for primary select box
@@ -33,6 +34,52 @@ if selected_category:
 
     # Display the selected option
     st.write(f"You selected: {selected_option}")
+    if selected_option == 'Sub Tasks':
+        st.write("head: ",data.head())
+        st.write("info: This is the raw data imported from database")
+        st.write("description stat: \n",data.describe())
+
+        top_10_handsets = data['Handset Type'].value_counts().head(10)
+        st.write("Top 10 Handsets:")
+        st.write(top_10_handsets)
+        fig, ax = plt.subplots()
+        top_10_handsets.plot(kind='barh', color='skyblue', ax=ax)
+        plt.title('Top 10 Handsets Used by Customers Visually')
+        plt.xlabel('Count')
+        plt.ylabel('Handset')
+
+# Display the plot using Streamlit's st.pyplot()
+        st.pyplot(fig)
+
+        theUndefined = data[data['Handset Type'] == 'undefined']
+        st.write("Rows where 'Handset Type' is 'undefined':")
+        st.write(theUndefined.head())
+        top_3_manufacturers = data['Handset Manufacturer'].value_counts().head(3)
+
+        fig, ax = plt.subplots()
+        top_3_manufacturers.plot(kind='bar', color='lightgreen', ax=ax)
+        plt.title('Top 3 Handset Manufacturers')
+        plt.xlabel('Manufacturers')
+        plt.ylabel('Count')
+        st.pyplot(fig)
+
+
+        for manufacturer in top_3_manufacturers.index:
+            st.write(f"Top 5 handsets for {manufacturer}:")
+            top_5_handsets = data[data['Handset Manufacturer'] == manufacturer]['Handset Type'].value_counts().head(5)
+            st.write(top_5_handsets)  # Display the top 5 handsets for the current manufacturer
+
+            # Plotting the top 5 handsets for the current manufacturer as a bar plot
+            fig, ax = plt.subplots()
+            top_5_handsets.plot(kind='bar', color=['darkgreen', 'blue', 'lightgreen', 'maroon', 'yellow'], ax=ax)
+            plt.title(f'Top 5 Handsets for {manufacturer}')
+            plt.xlabel('Handsets')
+            plt.ylabel('Count')
+
+            # Display the plot for the current manufacturer using Streamlit's st.pyplot()
+            st.pyplot(fig)
+
+        # Display the plot using Streamlit's st.pyplot()
 
 # # Sidebar for user input
 # st.sidebar.title("Dashboard Navigation")
