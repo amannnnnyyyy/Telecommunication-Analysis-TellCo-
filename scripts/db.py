@@ -51,6 +51,7 @@ def insert_data_to_postgres(df, table_name):
         # Connect to the PostgreSQL database
         conn = psycopg2.connect(
             host=os.environ.get("DB_OBJECT_HOST"),
+            port='5433',
             database=os.environ.get("DB_OBJECT_DATABASE"),
             user=os.environ.get("DB_OBJECT_USER"),
             password=os.environ.get("DB_OBJECT_PASSWORD")
