@@ -10,6 +10,8 @@ current_directory = os.path.dirname(os.path.abspath(__file__))
 scripts_directory = os.path.join(current_directory, '..', 'scripts')
 sys.path.append(scripts_directory)
 from db import returnFromDb
+from calc_stats import *
+from space import giveSpace
 from IPython.display import display
 from sklearn.decomposition import PCA
 
@@ -274,3 +276,61 @@ if selected_category:
         columns_per_row = 3  # Number of columns per row
 
         plot_dispersion_side_by_side(dispersion_parameters, columns_per_row)
+
+
+        cols = ['Avg RTT DL (ms)', 'Avg RTT DL (ms)', 'Avg Bearer TP DL (kbps)', 'Avg Bearer TP UL (kbps)']
+    # Display dispersion metrics
+        dispersion_summary = compute_dispersion(data)
+        st.write("Dispersion Summary:")
+        st.dataframe(dispersion_summary)
+
+        for column in cols:
+            st.write(f"Generating plots for {column}...\n")
+            
+            plot_histogram(data, column,True)
+            plot_boxplot(data, column,True)
+            plot_density(data, column,True)
+            plot_violin(data, column,True)
+
+        st.write(' ')
+        st.write(' ')
+        st.write(' ')
+        st.write(' ')
+        st.title('Bivariate Analysis')
+        app_columns = [
+            'Social Media DL (Bytes)', 'Social Media UL (Bytes)',
+            'Youtube DL (Bytes)', 'Youtube UL (Bytes)',
+            'Netflix DL (Bytes)', 'Netflix UL (Bytes)',
+            'Google DL (Bytes)', 'Google UL (Bytes)',
+            'Email DL (Bytes)', 'Email UL (Bytes)',
+            'Gaming DL (Bytes)', 'Gaming UL (Bytes)',
+            'Other DL (Bytes)', 'Other UL (Bytes)'
+        ]
+
+        # Add the new total column to the list
+        app_columns.append('Total Data (Bytes)')
+
+        # Compute correlation matrix
+        correlation_matrix = data[app_columns].corr()
+        st.markdown(
+            """
+            <style>
+            .streamlit-expanderHeader {
+                font-size: 20px;
+            }
+            .dataframe {
+                width: 100% !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
+
+        # Display the correlation matrix using st.dataframe for a wider view
+        st.dataframe(correlation_matrix['Total Data (Bytes)'], use_container_width=True)
+
+
+        giveSpace()
+        st.title('Total Data Usage with Each Application')
+
+        
