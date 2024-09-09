@@ -27,15 +27,15 @@ primary_options = {
 }
 
 # Sidebar for primary select box
-st.sidebar.title("Dynamic Select Boxes")
+st.sidebar.title("Teleco")
 
 # Primary select box
-selected_category = st.sidebar.selectbox("Select Category", options=list(primary_options.keys()))
+selected_category = st.sidebar.selectbox("Select Major Task", options=list(primary_options.keys()))
 
 # Secondary select box based on the primary selection
 if selected_category:
     secondary_options = primary_options[selected_category]
-    selected_option = st.sidebar.selectbox("Select Option", options=secondary_options)
+    selected_option = st.sidebar.selectbox("Select Sub Task", options=secondary_options)
 
     # Display the selected option
     if selected_option == 'Sub Tasks':
@@ -332,5 +332,31 @@ if selected_category:
 
         giveSpace()
         st.title('Total Data Usage with Each Application')
+        sns.heatmap(correlation_matrix[['Total Data (Bytes)']], annot=True, cmap='viridis')
+
+        plt.title('Correlation of Total Data Usage with Applications')
+
+        st.pyplot(plt)
+
+        giveSpace()
+        st.write(data.head(0))
+        data['Social Media Total'] = data['Social Media DL (Bytes)'] + data['Social Media UL (Bytes)']
+        data['Email Total'] = data['Email UL (Bytes)']+data['Email DL (Bytes)']
+        data['Google Total'] = data['Google DL (Bytes)'] + data['Google UL (Bytes)']
+        data['Youtube Total'] = data['Youtube DL (Bytes)'] + data['Youtube UL (Bytes)']
+        data['Netflix Total'] = data['Netflix DL (Bytes)'] + data['Netflix UL (Bytes)']
+        data['Gaming Total'] = data['Gaming DL (Bytes)']+data['Gaming UL (Bytes)']
+        data['Other Total'] = data['Other DL (Bytes)'] + data['Other UL (Bytes)']
+
+        correlation_matrix = data[['Social Media Total',	'Email Total',	'Google Total',	'Youtube Total',	'Netflix Total',	'Gaming Total',	'Other Total']].corr()
+
+        giveSpace()
+        st.subheader('Application Correlations with eachother')
+
+        plt.figure(figsize=(10, 8))  # Adjust the figure size as needed
+        sns.set(font_scale=1.2)  # Increase the font size
+        sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm',fmt='.4f', linewidths=1, linecolor='yellow')
+        plt.title('Correlation Matrix of Application Data Usage')
+        st.pyplot(plt)
 
         
