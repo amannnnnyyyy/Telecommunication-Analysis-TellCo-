@@ -1,6 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import streamlit as st
 
 def compute_dispersion(df):
     dispersion_summary = pd.DataFrame()
@@ -21,31 +22,42 @@ def compute_dispersion(df):
 
 
 
-def plot_histogram(df, column):
+def plot_histogram(df, column, streamlit = False):
     plt.figure(figsize=(10, 6))
     df[column].hist(bins=30, edgecolor='black')
     plt.xlabel(column)
     plt.ylabel('Frequency')
     plt.title(f'Histogram of {column}')
-    plt.show()
+    if(streamlit):
+        st.pyplot(plt)
+    else:
+        plt.show()
 
-def plot_boxplot(df, column):
+def plot_boxplot(df, column, streamlit=False):
     plt.figure(figsize=(10, 6))
     sns.boxplot(x=df[column])
     plt.xlabel(column)
     plt.title(f'Box Plot of {column}')
-    plt.show()
+    if(streamlit):
+        st.pyplot(plt)
+    else:
+        plt.show()
 
-def plot_density(df, column):
+def plot_density(df, column, streamlit=False):
     plt.figure(figsize=(10, 6))
     sns.kdeplot(df[column], shade=True)
     plt.xlabel(column)
     plt.title(f'Density Plot of {column}')
-    plt.show()
-
-def plot_violin(df, column):
+    if(streamlit):
+        st.pyplot(plt)
+    else:
+        plt.show()
+def plot_violin(df, column, streamlit = False):
     plt.figure(figsize=(10, 6))
     sns.violinplot(x=df[column])
     plt.xlabel(column)
     plt.title(f'Violin Plot of {column}')
-    plt.show()
+    if(streamlit):
+        st.pyplot(plt)
+    else:
+        plt.show()
