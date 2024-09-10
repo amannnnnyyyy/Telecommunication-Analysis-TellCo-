@@ -7,7 +7,7 @@ import numpy as np
 
 load_dotenv()
 
-database_Obj = os.environ.get('DB_Object')
+# database_Obj = os.environ.get('DB_Object')
 
 
 # os.getenv

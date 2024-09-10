@@ -12,6 +12,8 @@ sys.path.append(scripts_directory)
 from db import returnFromDb
 from calc_stats import *
 from space import giveSpace
+from data_manip import *
+
 from IPython.display import display
 from sklearn.decomposition import PCA
 
@@ -32,6 +34,8 @@ st.sidebar.title("Teleco")
 # Primary select box
 selected_category = st.sidebar.selectbox("Select Major Task", options=list(primary_options.keys()))
 
+
+data = calc_Total(data)
 # Secondary select box based on the primary selection
 if selected_category:
     secondary_options = primary_options[selected_category]
@@ -86,13 +90,7 @@ if selected_category:
 
 
         # Aggregating session data per user
-        data['Social Media Total'] = data['Social Media DL (Bytes)'] + data['Social Media UL (Bytes)']
-        data['Email Total'] = data['Email UL (Bytes)']+data['Email DL (Bytes)']
-        data['Google Total'] = data['Google DL (Bytes)'] + data['Google UL (Bytes)']
-        data['Youtube Total'] = data['Youtube DL (Bytes)'] + data['Youtube UL (Bytes)']
-        data['Netflix Total'] = data['Netflix DL (Bytes)'] + data['Netflix UL (Bytes)']
-        data['Gaming Total'] = data['Gaming DL (Bytes)']+data['Gaming UL (Bytes)']
-        data['Other Total'] = data['Other DL (Bytes)'] + data['Other UL (Bytes)']
+        
 
         user_behavior = data.groupby('MSISDN/Number').agg({
             'Bearer Id': 'count',
@@ -180,6 +178,7 @@ if selected_category:
         st.markdown("<br>", unsafe_allow_html=True)
         st.write('Total Data Usage for High Usage Applications:')
         st.pyplot(plt)
+
     elif selected_option == 'EDA':
         st.write("This is the exploratory data analysis section")
         missing_values_placeholder = st.empty()
@@ -340,13 +339,7 @@ if selected_category:
 
         giveSpace()
         st.write(data.head(0))
-        data['Social Media Total'] = data['Social Media DL (Bytes)'] + data['Social Media UL (Bytes)']
-        data['Email Total'] = data['Email UL (Bytes)']+data['Email DL (Bytes)']
-        data['Google Total'] = data['Google DL (Bytes)'] + data['Google UL (Bytes)']
-        data['Youtube Total'] = data['Youtube DL (Bytes)'] + data['Youtube UL (Bytes)']
-        data['Netflix Total'] = data['Netflix DL (Bytes)'] + data['Netflix UL (Bytes)']
-        data['Gaming Total'] = data['Gaming DL (Bytes)']+data['Gaming UL (Bytes)']
-        data['Other Total'] = data['Other DL (Bytes)'] + data['Other UL (Bytes)']
+        
 
         correlation_matrix = data[['Social Media Total',	'Email Total',	'Google Total',	'Youtube Total',	'Netflix Total',	'Gaming Total',	'Other Total']].corr()
 
@@ -358,5 +351,489 @@ if selected_category:
         sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm',fmt='.4f', linewidths=1, linecolor='yellow')
         plt.title('Correlation Matrix of Application Data Usage')
         st.pyplot(plt)
+
+
+    agg_data = data.groupby('IMEI').agg({
+        'Dur. (ms)': 'sum', # Total session duration
+        'Bearer Id': 'count', # Session frequency (count of sessions)
+        'Total DL (Bytes)': 'sum', # Total download traffic
+        'Total UL (Bytes)': 'sum'  # Total upload traffic
+    }).reset_index()
+
+    # Create total traffic column (DL + UL)
+    agg_data['Total Traffic (Bytes)'] = agg_data['Total DL (Bytes)'] + agg_data['Total UL (Bytes)']
+
+    if selected_option == 'Engagement metrics per user':
+        st.subheader("This is the engagement metrics per user section")
+
+        engagement_metrics = data.groupby('MSISDN/Number').agg({
+            'Bearer Id': 'count',    # Number of sessions
+            'Dur. (ms)': 'sum',      # Session duration
+            'Avg Bearer TP DL (kbps)': 'sum',  # Download traffic
+            'Avg Bearer TP UL (kbps)': 'sum',  # Upload traffic
+        })
+
+        # Normalize the engagement metrics
+        from sklearn.preprocessing import StandardScaler
+        scaler = StandardScaler()
+        normalized_metrics = scaler.fit_transform(engagement_metrics)
+
+        # Perform k-means clustering
+        from sklearn.cluster import KMeans
+
+        kmeans = KMeans(n_clusters=3, random_state=0)
+        engagement_metrics['cluster'] = kmeans.fit_predict(normalized_metrics)
+
+        # Use elbow method to determine optimal k
+        wcss = []
+        for i in range(1, 11):
+            kmeans = KMeans(n_clusters=i, random_state=0)
+            kmeans.fit(normalized_metrics)
+            wcss.append(kmeans.inertia_)
+
+        giveSpace()
+        st.write('Elbow Method K-means Clustering for Engagement Metrics')
+
+        # Plot elbow method
+        plt.plot(range(1, 11), wcss)
+        plt.title('Elbow Method')
+        plt.xlabel('Number of Clusters')
+        plt.ylabel('WCSS')
+        st.pyplot(plt)
+
+
+        
+
+        # Sort data by session frequency, duration, and total traffic
+        top_customers_by_frequency = agg_data.sort_values(by='Bearer Id', ascending=False).head(10)
+        top_customers_by_duration = agg_data.sort_values(by='Dur. (ms)', ascending=False).head(10)
+        top_customers_by_traffic = agg_data.sort_values(by='Total Traffic (Bytes)', ascending=False).head(10)
+
+        def highlight_column(s,column):
+            return ['background-color: lightgreen' if s.name == column else '' for _ in s]
+        
+
+        st.write('Top customers by frequency: \n')
+        st.dataframe(top_customers_by_frequency.style.apply(highlight_column,column = 'Bearer Id', axis=0))
+
+        st.write('Top customers by duration: \n')
+        st.dataframe(top_customers_by_duration.style.apply(highlight_column,column = 'Dur. (ms)', axis=0))
+
+        st.write('Top customers by traffic: \n')
+        st.dataframe(top_customers_by_traffic.style.apply(highlight_column,column = 'Total Traffic (Bytes)', axis=0))
+        
+    elif selected_option == 'Engagement per App':    
+        from sklearn.preprocessing import MinMaxScaler
+
+        # Normalize the engagement metrics
+        scaler = MinMaxScaler()
+        agg_data[['Bearer Id', 'Dur. (ms)', 'Total Traffic (Bytes)']] = scaler.fit_transform(agg_data[['Bearer Id', 'Dur. (ms)', 'Total Traffic (Bytes)']])
+
+        from sklearn.cluster import KMeans
+
+        # Run K-means clustering with k=3
+        kmeans = KMeans(n_clusters=3, random_state=42)
+        agg_data['Engagement Cluster'] = kmeans.fit_predict(agg_data[['Bearer Id', 'Dur. (ms)', 'Total Traffic (Bytes)']])
+
+        # Add the cluster labels back to the non-normalized data
+        agg_data['Cluster'] = kmeans.labels_
+
+        # Count the number of data points in each cluster
+        cluster_counts = agg_data['Engagement Cluster'].value_counts()
+
+        # Create a bar plot
+        sns.barplot(x=cluster_counts.index, y=cluster_counts)
+
+        # Set labels and title
+        plt.xlabel('Cluster')
+        plt.ylabel('Count')
+        plt.title('Cluster Data Count')
+
+        st.pyplot(plt)
+
+
+        agg_data[['Bearer Id', 'Dur. (ms)', 'Total Traffic (Bytes)']] = scaler.inverse_transform(
+            agg_data[['Bearer Id', 'Dur. (ms)', 'Total Traffic (Bytes)']])
+
+        cluster_summary = agg_data.groupby('Cluster').agg({
+            'Bearer Id': ['min', 'max', 'mean', 'sum'],
+            'Dur. (ms)': ['min', 'max', 'mean', 'sum'],
+            'Total Traffic (Bytes)': ['min', 'max', 'mean', 'sum']
+        })
+
+        st.write(cluster_summary)
+        giveSpace()
+        # Get the top 10 most engaged users per application
+        top_social_media_users = data[['IMEI', 'Social Media Total']].nlargest(10, 'Social Media Total')
+        top_youtube_users = data[['IMEI', 'Youtube Total']].nlargest(10, 'Youtube Total')
+        top_netflix_users = data[['IMEI', 'Netflix Total']].nlargest(10, 'Netflix Total')
+
+        # Display the top users per application
+        st.write("Top 10 Most Engaged Users for Social Media:")
+        st.write(top_social_media_users)
+        st.write("\nTop 10 Most Engaged Users for YouTube:")
+        st.write(top_youtube_users)
+        st.write("\nTop 10 Most Engaged Users for Netflix:")
+        st.write(top_netflix_users)
+        giveSpace()
+        # Get the top 10 most engaged users per application
+        top_users_per_app = data[['IMEI', 'Social Media Total', 'Youtube Total', 'Netflix Total','Gaming Total', 'Other Total']].nlargest(10, 'Social Media Total')
+        st.write(top_users_per_app)
+
+        giveSpace()
+        app_totals = pd.DataFrame({
+            'Application': ['Social Media', 'YouTube', 'Netflix', 'Google', 'Email', 'Gaming', 'Other'],
+            'Total Usage (Bytes)': [
+                data['Social Media Total'].sum(),
+                data['Youtube Total'].sum(),
+                data['Netflix Total'].sum(),
+                data['Google Total'].sum(),
+                data['Email Total'].sum(),
+                data['Gaming Total'].sum(),
+                data['Other Total'].sum()
+            ]
+        })
+
+        # Step 3: Find the top 3 most used applications
+        top_3_apps = app_totals.nlargest(3, 'Total Usage (Bytes)')
+        st.write("Top 3 Most Used Applications:")
+        st.write(top_3_apps)
+
+        # Plotting the top 3 most used applications
+        apps = ['Gaming Total', 'Youtube Total', 'Other Total']
+        data[apps].sum().plot(kind='bar', title='Top 3 Most Used Applications')
+        plt.ylabel('Total Data Usage (Bytes)')
+        st.pyplot(plt)
+
+        giveSpace()
+
+    elif selected_option == 'Kmeans':
+        from sklearn.metrics import silhouette_score
+
+        inertia = []
+        K = range(1, 10)
+        for k in K:
+            kmeans = KMeans(n_clusters=k, random_state=42)
+            kmeans.fit(agg_data[['Bearer Id', 'Dur. (ms)', 'Total Traffic (Bytes)']])
+            inertia.append(kmeans.inertia_)
+
+        # Plot the elbow curve
+        plt.plot(K, inertia, 'bx-')
+        plt.xlabel('k')
+        plt.ylabel('Inertia')
+        plt.title('Elbow Method to find optimal k')
+        st.pyplot(plt)
+
+        giveSpace()
+
+    data['TCP DL Retrans. Vol (Bytes)'].fillna(data['TCP DL Retrans. Vol (Bytes)'].mean(), inplace=True)
+    data['Avg RTT DL (ms)'].fillna(data['Avg RTT DL (ms)'].mean(), inplace=True)
+    data['Avg Bearer TP DL (kbps)'].fillna(data['Avg Bearer TP DL (kbps)'].mean(), inplace=True)
+    data['Handset Type'].fillna(data['Handset Type'].mode()[0], inplace=True)
+
+    customer_data = data.groupby('MSISDN/Number').agg({
+        'TCP DL Retrans. Vol (Bytes)': 'mean',
+        'Avg RTT DL (ms)': 'mean',
+        'Avg Bearer TP DL (kbps)': 'mean',
+        'Handset Type': lambda x: x.mode()[0]  # Mode to capture most frequent handset type
+    }).reset_index()
+
+    customer_data.columns = ['MSISDN', 'Avg TCP Retrans', 'Avg RTT', 'Avg Throughput', 'Handset Type']
+
+        # Top 10 TCP retransmission
+    top_10_tcp = customer_data.nlargest(10, 'Avg TCP Retrans')
+
+    # Bottom 10 TCP retransmission
+    bottom_10_tcp = customer_data.nsmallest(10, 'Avg TCP Retrans')
+
+    # Most frequent TCP values
+    most_frequent_tcp = customer_data['Avg TCP Retrans'].mode()
+
+    top_10_rtt = customer_data.nlargest(10, 'Avg RTT')
+
+    # Bottom 10 RTT
+    bottom_10_rtt = customer_data.nsmallest(10, 'Avg RTT')
+
+    # Most frequent RTT values
+    most_frequent_rtt = customer_data['Avg RTT'].mode()
+
+
+    # Top 10 Throughput
+    top_10_throughput = customer_data.nlargest(10, 'Avg Throughput')
+
+    # Bottom 10 Throughput
+    bottom_10_throughput = customer_data.nsmallest(10, 'Avg Throughput')
+
+    # Most frequent Throughput values
+    most_frequent_throughput = customer_data['Avg Throughput'].mode()
+
+
+    # Step 1: Prepare the data for Top, Bottom, and Most Frequent Throughput
+    top_throughput = customer_data.groupby('Handset Type')['Avg Throughput'].mean().reset_index()
+    top_throughput = top_throughput.sort_values(by='Avg Throughput', ascending=False).head(10)
+    top_throughput['Category'] = 'Top 10'
+
+    bottom_throughput = customer_data.groupby('Handset Type')['Avg Throughput'].mean().reset_index()
+    bottom_throughput = bottom_throughput.sort_values(by='Avg Throughput', ascending=True).head(10)
+    bottom_throughput['Category'] = 'Bottom 10'
+
+    most_frequent = customer_data['Handset Type'].value_counts().reset_index().head(10)
+    most_frequent.columns = ['Handset Type', 'Count']
+    most_frequent = pd.merge(most_frequent, customer_data.groupby('Handset Type')['Avg Throughput'].mean().reset_index(), on='Handset Type')
+    most_frequent['Category'] = 'Most Frequent'
+
+    # Combine data into a single DataFrame
+    combined_throughput = pd.concat([top_throughput, bottom_throughput, most_frequent[['Handset Type', 'Avg Throughput', 'Category']]])
+
+    # Step 1: Extract top, bottom, and most frequent data for TCP Retransmission, RTT, and Throughput
+    top_tcp = customer_data.groupby('Handset Type')['Avg TCP Retrans'].mean().reset_index().sort_values(by='Avg TCP Retrans', ascending=False).head(10)
+    bottom_tcp = customer_data.groupby('Handset Type')['Avg TCP Retrans'].mean().reset_index().sort_values(by='Avg TCP Retrans', ascending=True).head(10)
+    most_frequent_tcp = customer_data['Handset Type'].value_counts().reset_index().head(10)
+    most_frequent_tcp.columns = ['Handset Type', 'Count']
+    most_frequent_tcp = pd.merge(most_frequent_tcp, customer_data.groupby('Handset Type')['Avg TCP Retrans'].mean().reset_index(), on='Handset Type')
+
+    top_rtt = customer_data.groupby('Handset Type')['Avg RTT'].mean().reset_index().sort_values(by='Avg RTT', ascending=False).head(10)
+    bottom_rtt = customer_data.groupby('Handset Type')['Avg RTT'].mean().reset_index().sort_values(by='Avg RTT', ascending=True).head(10)
+    most_frequent_rtt = pd.merge(most_frequent_tcp[['Handset Type', 'Count']], customer_data.groupby('Handset Type')['Avg RTT'].mean().reset_index(), on='Handset Type')
+
+    top_throughput = customer_data.groupby('Handset Type')['Avg Throughput'].mean().reset_index().sort_values(by='Avg Throughput', ascending=False).head(10)
+    bottom_throughput = customer_data.groupby('Handset Type')['Avg Throughput'].mean().reset_index().sort_values(by='Avg Throughput', ascending=True).head(10)
+    most_frequent_throughput = pd.merge(most_frequent_tcp[['Handset Type', 'Count']], customer_data.groupby('Handset Type')['Avg Throughput'].mean().reset_index(), on='Handset Type')
+
+
+    combined_tcp = pd.concat([top_tcp, bottom_tcp, most_frequent_tcp[['Handset Type', 'Avg TCP Retrans']]])
+    combined_tcp['Category'] = ['Top 10']*10 + ['Bottom 10']*10 + ['Most Frequent']*10
+
+    combined_rtt = pd.concat([top_rtt, bottom_rtt, most_frequent_rtt[['Handset Type', 'Avg RTT']]])
+    combined_rtt['Category'] = ['Top 10']*10 + ['Bottom 10']*10 + ['Most Frequent']*10
+
+    combined_throughput = pd.concat([top_throughput, bottom_throughput, most_frequent_throughput[['Handset Type', 'Avg Throughput']]])
+    combined_throughput['Category'] = ['Top 10']*10 + ['Bottom 10']*10 + ['Most Frequent']*10
+
+    if selected_option == 'top, bottom, and most frequent':
+        st.title('Top Bottom and Most Frequent')
+        # Step 3: Create subplots for TCP, RTT, and Throughput
+        fig, axes = plt.subplots(3, 1, figsize=(12, 18))
+
+        # Plot TCP Retransmission
+        sns.barplot(x='Avg TCP Retrans', y='Handset Type', hue='Category', data=combined_tcp, ax=axes[0], palette='muted')
+        axes[0].set_title('Top, Bottom, and Most Frequent Handset Types by TCP Retransmission')
+        axes[0].set_xscale('log')  # Apply log scale for visibility
+        axes[0].set_xlabel('Average TCP Retransmission (log scale)')
+
+        # Plot RTT
+        sns.barplot(x='Avg RTT', y='Handset Type', hue='Category', data=combined_rtt, ax=axes[1], palette='muted')
+        axes[1].set_title('Top, Bottom, and Most Frequent Handset Types by RTT')
+        axes[1].set_xscale('log')  # Apply log scale for visibility
+        axes[1].set_xlabel('Average RTT (log scale)')
+
+        # Plot Throughput
+        sns.barplot(x='Avg Throughput', y='Handset Type', hue='Category', data=combined_throughput, ax=axes[2], palette='muted')
+        axes[2].set_title('Top, Bottom, and Most Frequent Handset Types by Throughput')
+        axes[2].set_xscale('log')  # Apply log scale for visibility
+        axes[2].set_xlabel('Average Throughput (log scale)')
+
+        # Adjust layout and show plot
+        plt.tight_layout()
+        st.pyplot(plt)
+
+    if selected_option == 'Thoughput and TCP':
+        # Sort by average throughput and select top 15 handset types for better visibility
+        throughput_dist = customer_data.groupby('Handset Type')['Avg Throughput'].mean().reset_index()
+        throughput_dist = throughput_dist.sort_values(by='Avg Throughput', ascending=False).head(15)
+    
+        # Larger figure, distinct color palette, and sorted bar plot
+        plt.figure(figsize=(14, 8))
+        sns.barplot(x='Avg Throughput', y='Handset Type', data=throughput_dist, palette="coolwarm")
+
+        plt.title('Top 15 Handset Types by Average Throughput', fontsize=16)
+        plt.xlabel('Average Throughput (kbps)', fontsize=12)
+        plt.ylabel('Handset Type', fontsize=12)
+        plt.tight_layout()
+        st.pyplot(plt)
+
+
+        # Sort by average TCP retransmission and select top 15 handset types
+        tcp_dist = customer_data.groupby('Handset Type')['Avg TCP Retrans'].mean().reset_index()
+        tcp_dist = tcp_dist.sort_values(by='Avg TCP Retrans', ascending=False).head(15)
+
+        # Larger figure, distinct color palette, and sorted bar plot
+        plt.figure(figsize=(14, 8))
+        sns.barplot(x='Avg TCP Retrans', y='Handset Type', data=tcp_dist, palette="coolwarm")
+
+        plt.title('Top 15 Handset Types by Average TCP Retransmission', fontsize=16)
+        plt.xlabel('Average TCP Retransmission (Bytes)', fontsize=12)
+        plt.ylabel('Handset Type', fontsize=12)
+        plt.tight_layout()
+        st.pyplot(plt)
+
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.cluster import KMeans
+
+    agg_data = data.groupby('MSISDN/Number').agg({
+        'TCP DL Retrans. Vol (Bytes)': 'mean',
+        'Avg RTT DL (ms)': 'mean',
+        'Avg Bearer TP DL (kbps)': 'mean'
+    }).reset_index()
+
+    # Rename columns for convenience
+    agg_data.rename(columns={
+        'TCP DL Retrans. Vol (Bytes)': 'Avg_TCP_Retrans',
+        'Avg RTT DL (ms)': 'Avg_RTT',
+        'Avg Bearer TP DL (kbps)': 'Avg_Throughput'
+    }, inplace=True)
+
+    # Step 2: Normalize the data
+    scaler = StandardScaler()
+    scaled_data = scaler.fit_transform(agg_data[['Avg_TCP_Retrans', 'Avg_RTT', 'Avg_Throughput']])
+
+    if selected_option == 'Kmeans clustering':
+        kmeans = KMeans(n_clusters=3, random_state=0)
+        agg_data['Cluster'] = kmeans.fit_predict(scaled_data)
+        cluster_summary = agg_data.groupby('Cluster').agg({
+            'Avg_TCP_Retrans': ['mean', 'min', 'max'],
+            'Avg_RTT': ['mean', 'min', 'max'],
+            'Avg_Throughput': ['mean', 'min', 'max']
+        })
+
+        st.write(cluster_summary)
+
+        fig = plt.figure(figsize=(14, 10))
+        ax = fig.add_subplot(111, projection='3d')
+
+        # Scatter plot
+        scatter = ax.scatter(
+            agg_data['Avg_TCP_Retrans'],
+            agg_data['Avg_RTT'],
+            agg_data['Avg_Throughput'],
+            c=agg_data['Cluster'],  # Color by cluster
+            cmap='viridis',  # Color map
+            s=50,  # Marker size
+            alpha=0.6
+        )
+
+        # Labels
+        ax.set_xlabel('Average TCP Retransmission (Bytes)')
+        ax.set_ylabel('Average RTT (ms)')
+        ax.set_zlabel('Average Throughput (kbps)')
+        plt.title('3D Scatter Plot of Clusters', fontsize=16)
+        plt.colorbar(scatter, label='Cluster')
+        st.pyplot(plt)
+
+
+        # Plot pairwise relationships
+        sns.pairplot(agg_data, hue='Cluster', palette='viridis', vars=['Avg_TCP_Retrans', 'Avg_RTT', 'Avg_Throughput'])
+        plt.suptitle('Pairwise Plots of Clusters', y=1.02, fontsize=16)
+        st.pyplot(plt)
+
+        # Function to plot radar chart
+        def plot_radar(df, title, labels, colors):
+            num_vars = len(labels)
+            angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
+            angles += angles[:1]
+
+            fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
+            for i, color in enumerate(colors):
+                values = df.loc[i].values.flatten().tolist()
+                values += values[:1]
+                ax.plot(angles, values, color=color, linewidth=2, linestyle='solid', label=f'Cluster {i}')
+                ax.fill(angles, values, color=color, alpha=0.25)
+
+            ax.set_yticklabels([])
+            ax.set_xticks(angles[:-1])
+            ax.set_xticklabels(labels)
+            plt.title(title, fontsize=16)
+            plt.legend(loc='upper right', bbox_to_anchor=(1.2, 1.1))
+            st.pyplot(plt)
+
+        # Prepare data for radar chart
+        cluster_means = agg_data.groupby('Cluster').mean().reset_index()
+        labels = ['Avg_TCP_Retrans', 'Avg_RTT', 'Avg_Throughput']
+        colors = ['blue', 'green', 'red']
+        plot_radar(cluster_means[labels], 'Radar Chart of Clusters', labels, colors)
+
+    features = ['Avg_TCP_Retrans', 'Avg_RTT', 'Avg_Throughput']
+    X = agg_data[features]
+
+    
+    
+
+    # Perform K-Means clustering for engagement
+    kmeans_engagement = KMeans(n_clusters=3, random_state=42)
+    agg_data['Engagement_Cluster'] = kmeans_engagement.fit_predict(X)
+    engagement_centroids = kmeans_engagement.cluster_centers_
+
+    # Perform K-Means clustering for experience
+    kmeans_experience = KMeans(n_clusters=3, random_state=42)
+    agg_data['Experience_Cluster'] = kmeans_experience.fit_predict(X)
+    experience_centroids = kmeans_experience.cluster_centers_
+
+    # Compute engagement and experience scores
+    from model_related_calc import *
+    least_engaged_centroid = engagement_centroids[agg_data['Engagement_Cluster'].mode().iloc[0]]
+    worst_experience_centroid = experience_centroids[agg_data['Experience_Cluster'].mode().iloc[0]]
+
+    agg_data['Engagement Score'] = compute_distance(agg_data, least_engaged_centroid,features)
+    agg_data['Experience Score'] = compute_distance(agg_data, worst_experience_centroid,features)
+
+    agg_data.to_csv('engagement_experience_scores.csv', index=False)
+
+    scores_data = pd.read_csv('engagement_experience_scores.csv')
+
+    # Calculate satisfaction score
+    scores_data['Satisfaction Score'] = (scores_data['Engagement Score'] + scores_data['Experience Score']) / 2
+
+    # Get top 10 satisfied customers
+    top_10_satisfied = scores_data.nlargest(10, 'Satisfaction Score')
+
+    if selected_option == 'Engagement score':
+        st.title('Engagement Score')
+        # Display top 10 satisfied customers
+        st.write(top_10_satisfied[['MSISDN/Number', 'Satisfaction Score']])
+
+
+    if selected_option == 'Regression model':
+        from sklearn.linear_model import LinearRegression
+        from sklearn.model_selection import train_test_split
+        from sklearn.metrics import mean_squared_error
+
+        # Prepare data for regression model
+        features = ['Engagement Score', 'Experience Score']
+        X = scores_data[features]
+        y = scores_data['Satisfaction Score']
+
+        # Split data into training and testing sets
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
+        # Train regression model
+        model = LinearRegression()
+        model.fit(X_train, y_train)
+
+        # Predict and evaluate
+        y_pred = model.predict(X_test)
+        mse = mean_squared_error(y_test, y_pred)
+
+        # Display results
+        st.write(f"Mean Squared Error of the regression model: {mse}")
+
+
+        # Prepare data for K-Means clustering
+        X_scores = scores_data[['Engagement Score', 'Experience Score']]
+
+        # Perform K-Means clustering with k=2
+        kmeans_scores = KMeans(n_clusters=2, random_state=42)
+        scores_data['Cluster'] = kmeans_scores.fit_predict(X_scores)
+
+        # Display clustering results
+        st.write(scores_data[['MSISDN/Number', 'Cluster']])
+
+        # Aggregate average satisfaction and experience scores per cluster
+        cluster_aggregates = scores_data.groupby('Cluster').agg({
+            'Satisfaction Score': 'mean',
+            'Experience Score': 'mean'
+        }).reset_index()
+
+        # Display aggregated scores
+        st.write(cluster_aggregates)
 
         
