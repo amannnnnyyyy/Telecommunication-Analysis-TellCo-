@@ -19,7 +19,8 @@ def returnFromDb():
         host= os.environ.get("DB_OBJECT_HOST"),
         database= os.environ.get("DB_OBJECT_DATABASE"),
         user= os.environ.get("DB_OBJECT_USER"),
-        password= os.environ.get("DB_OBJECT_PASSWORD")
+        password= os.environ.get("DB_OBJECT_PASSWORD"),
+        port = 19773
 
     )
 
